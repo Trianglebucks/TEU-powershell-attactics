@@ -88,3 +88,38 @@ cmd.exe /c  "reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\E
 cmd.exe /c  "reg query HKLM\system\currentcontrolset\services /s | findstr ImagePath 2>nul | findstr /Ri `".*\.sys$`""
 cmd.exe /c  "reg query HKLM\Software\Microsoft\Windows\CurrentVersion\Run"
 
+Start-Sleep -Seconds 2
+
+# Downloads an image from a URL and sets it as the desktop wallpaper
+$url = "https://i.kym-cdn.com/entries/icons/original/000/021/807/ig9OoyenpxqdCQyABmOQBZDI0duHk2QZZmWg2Hxd4ro.jpg"
+$imgLocation = "$env:TEMP\new.png"
+$orgWallpaper = (Get-ItemProperty -Path Registry::'HKEY_CURRENT_USER\Control Panel\Desktop\' -Name WallPaper).WallPaper
+$orgWallpaper | Out-File -FilePath "$env:TEMP\old.png"
+$updateWallpapercode = @'
+using System.Runtime.InteropServices;
+namespace Win32{
+
+     public class Wallpaper{
+         [DllImport("user32.dll", CharSet=CharSet.Auto)]
+          static extern int SystemParametersInfo (int uAction , int uParam , string lpvParam , int fuWinIni) ;
+
+          public static void SetWallpaper(string thePath){
+             SystemParametersInfo(20,0,thePath,3);
+         }
+     }
+ }
+'@
+ $wc = New-Object System.Net.WebClient
+ try{
+     $wc.DownloadFile($url, $imgLocation)
+     add-type $updateWallpapercode
+     [Win32.Wallpaper]::SetWallpaper($imgLocation)
+ }
+ catch [System.Net.WebException]{
+     Write-Host("Cannot download $url"+ [System.Net.WebException])
+     add-type $updateWallpapercode
+     [Win32.Wallpaper]::SetWallpaper($imgLocation)
+ }
+ finally{
+     $wc.Dispose()
+}
